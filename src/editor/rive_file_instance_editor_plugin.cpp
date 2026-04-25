@@ -90,7 +90,7 @@ Transform2D RiveFileInstanceEditorPlugin::get_viewport_to_parent_xform(RiveFileI
 }
 
 Vector2 RiveFileInstanceEditorPlugin::get_handle_viewport_pos(int idx, RiveFileInstance *node) const {
-    Rect2 rect = node->get_rect();
+    Rect2 rect = node->get_rive_bounds();
     Vector2 local_pos = rect.position + Vector2(rect.size.x * HANDLES[idx].fx,
                                                 rect.size.y * HANDLES[idx].fy);
     Transform2D xform = node->get_viewport_transform() * node->get_global_transform();
@@ -119,7 +119,7 @@ bool RiveFileInstanceEditorPlugin::_forward_canvas_gui_input(const Ref<InputEven
             if (h >= 0) {
                 dragging_handle = h;
 
-                Rect2 rect = node->get_rect();
+                Rect2 rect = node->get_rive_bounds();
                 // Anchor fraction is opposite of handle fraction
                 float afx = 1.0f - HANDLES[h].fx;
                 float afy = 1.0f - HANDLES[h].fy;
@@ -215,7 +215,7 @@ void RiveFileInstanceEditorPlugin::_forward_canvas_draw_over_viewport(Control *p
     if (!node || !node->is_visible_in_tree()) return;
 
     Transform2D xform = node->get_viewport_transform() * node->get_global_transform();
-    Rect2 rect = node->get_rect();
+    Rect2 rect = node->get_rive_bounds();
 
     // Selection border
     PackedVector2Array pts;

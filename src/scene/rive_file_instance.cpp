@@ -20,12 +20,8 @@ void RiveFileInstance::_bind_methods() {
     
     ClassDB::bind_method(D_METHOD("set_auto_play", "auto_play"), &RiveFileInstance::set_auto_play);
     ClassDB::bind_method(D_METHOD("get_auto_play"), &RiveFileInstance::get_auto_play);
-    
+    ClassDB::bind_method(D_METHOD("get_view_model_instance"), &RiveFileInstance::get_view_model_instance);
     ClassDB::bind_method(D_METHOD("_input", "event"), &RiveFileInstance::_input);
-    
-    ClassDB::bind_method(D_METHOD("get_rect"), &RiveFileInstance::get_rect);
-    ClassDB::bind_method(D_METHOD("_edit_get_rect"), &RiveFileInstance::_edit_get_rect);
-    ClassDB::bind_method(D_METHOD("_edit_use_rect"), &RiveFileInstance::_edit_use_rect);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "rive_file", PROPERTY_HINT_RESOURCE_TYPE, "RiveFile"), "set_rive_file", "get_rive_file");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "artboard_name"), "set_artboard_name", "get_artboard_name");
@@ -34,12 +30,11 @@ void RiveFileInstance::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "auto_play"), "set_auto_play", "get_auto_play");
 }
 
-RiveFileInstance::RiveFileInstance() {}
+RiveFileInstance::RiveFileInstance() {
+    rive_player.instantiate();
+}
 
 RiveFileInstance::~RiveFileInstance() {
-    artboard.reset();
-    state_machine.reset();
-    animation.reset();
 }
 
 void RiveFileInstance::_notification(int p_what) {
@@ -72,7 +67,7 @@ String RiveFileInstance::get_artboard_name() const {
 
 void RiveFileInstance::set_state_machine_name(const String &p_name) {
     state_machine_name = p_name;
-    _load_artboard(); // Reload to apply state machine
+    _load_artboard();
 }
 
 String RiveFileInstance::get_state_machine_name() const {
@@ -81,7 +76,7 @@ String RiveFileInstance::get_state_machine_name() const {
 
 void RiveFileInstance::set_animation_name(const String &p_name) {
     animation_name = p_name;
-    _load_artboard(); // Reload to apply animation
+    _load_artboard();
 }
 
 String RiveFileInstance::get_animation_name() const {
@@ -98,54 +93,34 @@ bool RiveFileInstance::get_auto_play() const {
 
 void RiveFileInstance::_load_artboard() {
     if (rive_file_resource.is_null()) return;
+    if (!rive_player.is_valid()) return;
     
-    // Reset existing
-    artboard.reset();
-    state_machine.reset();
-    animation.reset();
-
-    // Use RiveFile to instantiate artboard (handles both Rive and SVG)
-    artboard = rive_file_resource->instantiate_artboard(artboard_name);
+    std::unique_ptr<rive::ArtboardInstance> artboard = rive_file_resource->instantiate_artboard(artboard_name);
 
     if (!artboard) return;
 
-    // Load State Machine or Animation
-    if (!state_machine_name.is_empty()) {
-        state_machine = artboard->stateMachineNamed(state_machine_name.utf8().get_data());
-    } else if (artboard->stateMachineCount() > 0) {
-        // Default to first state machine if available and no animation specified?
-        // Or maybe we should be explicit.
-        // Let's try to load default state machine if no name provided
-        state_machine = artboard->stateMachineAt(0);
+    rive::rcp<rive::File> file;
+    if (rive_file_resource->get_rive_file()) {
+        file = rive::rcp<rive::File>(rive_file_resource->get_rive_file());
     }
 
-    if (!state_machine && !animation_name.is_empty()) {
-        animation = artboard->animationNamed(animation_name.utf8().get_data());
-    } else if (!state_machine && artboard->animationCount() > 0) {
-        animation = artboard->animationAt(0);
-    }
-    
-    if (artboard) {
-        artboard->advance(0.0f);
+    rive_player->set_artboard(std::move(artboard), file);
+
+    if (!state_machine_name.is_empty()) {
+        rive_player->play_state_machine(state_machine_name);
+    } else if (!animation_name.is_empty()) {
+        rive_player->play_animation(animation_name);
     }
 }
 
 void RiveFileInstance::advance(double delta) {
-    if (!artboard) return;
+    if (!rive_player.is_valid()) return;
     if (!auto_play) return;
-
-    if (state_machine) {
-        state_machine->advance(delta);
-    } else if (animation) {
-        animation->advance(delta);
-        animation->apply();
-    }
-    
-    artboard->advance(delta);
+    rive_player->advance(delta);
 }
 
 void RiveFileInstance::draw(rive::Renderer *renderer) {
-    if (!artboard) return;
+    if (!rive_player.is_valid()) return;
     
     renderer->save();
     
@@ -156,15 +131,22 @@ void RiveFileInstance::draw(rive::Renderer *renderer) {
         xform.columns[2].x, xform.columns[2].y
     );
     
-    renderer->transform(rive_transform);
-    artboard->draw(renderer);
+    rive_player->draw(renderer, rive_transform);
     
     renderer->restore();
 }
 
+Rect2 RiveFileInstance::get_rive_bounds() const {
+    if (rive_player.is_valid() && rive_player->get_artboard()) {
+        rive::AABB aabb = rive_player->get_artboard()->bounds();
+        return Rect2(aabb.minX, aabb.minY, aabb.width(), aabb.height());
+    }
+    return Rect2(-32, -32, 64, 64); // default so node is selectable in editor
+}
+
 void RiveFileInstance::_draw() {
     if (Engine::get_singleton()->is_editor_hint()) {
-        draw_rect(get_rect(), Color(1, 1, 1, 0.01)); // Almost transparent for selection
+        draw_rect(get_rive_bounds(), Color(1, 1, 1, 0.01));
     }
 }
 
@@ -178,64 +160,64 @@ void RiveFileInstance::_input(const Ref<InputEvent> &p_event) {
         }
         return;
     }
-
     Ref<InputEventMouseMotion> mm = p_event;
     if (mm.is_valid()) {
         pointer_move(mm->get_position());
     }
 }
 
-Rect2 RiveFileInstance::_edit_get_rect() const {
-    return get_rect();
-}
-
-bool RiveFileInstance::_edit_use_rect() const {
-    return true;
-}
-
-Rect2 RiveFileInstance::get_rect() const {
-    if (artboard) {
-        rive::AABB bounds = artboard->bounds();
-        return Rect2(bounds.minX, bounds.minY, bounds.width(), bounds.height());
-    }
-    // Return a default rect so it can be selected in editor even without a file
-    return Rect2(-32, -32, 64, 64);
-}
-
 bool RiveFileInstance::hit_test(Vector2 point) {
-    // Point is in parent space (CanvasLayer space)
-    // We need to transform it to local space?
-    // Rive hitTest expects coordinates in the artboard space?
-    // No, Rive hitTest usually works with the transformed components.
-    // But here we are transforming the renderer.
-    
-    // If we want to hit test, we should probably transform the point into the Node's local space
-    // and then check against the artboard bounds?
-    // Or better, let Rive handle it if we can pass the transform.
-    
-    // For now, simple bounding box check or just return false.
-    // Implementing proper hit test requires more complex logic with Rive.
+    if (rive_player.is_valid()) {
+        Transform2D xform = get_transform();
+        rive::Mat2D rive_transform(
+            xform.columns[0].x, xform.columns[0].y,
+            xform.columns[1].x, xform.columns[1].y,
+            xform.columns[2].x, xform.columns[2].y
+        );
+        return rive_player->hit_test(point, rive_transform);
+    }
     return false; 
 }
 
 void RiveFileInstance::pointer_down(Vector2 position) {
-    if (state_machine) {
-        // Transform position (Global) to local space
-        Vector2 local = to_local(position);
-        state_machine->pointerDown(rive::Vec2D(local.x, local.y));
+    if (rive_player.is_valid()) {
+        Transform2D xform = get_transform();
+        rive::Mat2D rive_transform(
+            xform.columns[0].x, xform.columns[0].y,
+            xform.columns[1].x, xform.columns[1].y,
+            xform.columns[2].x, xform.columns[2].y
+        );
+        rive_player->pointer_down(position, rive_transform);
     }
 }
 
 void RiveFileInstance::pointer_up(Vector2 position) {
-    if (state_machine) {
-        Vector2 local = to_local(position);
-        state_machine->pointerUp(rive::Vec2D(local.x, local.y));
+    if (rive_player.is_valid()) {
+        Transform2D xform = get_transform();
+        rive::Mat2D rive_transform(
+            xform.columns[0].x, xform.columns[0].y,
+            xform.columns[1].x, xform.columns[1].y,
+            xform.columns[2].x, xform.columns[2].y
+        );
+        rive_player->pointer_up(position, rive_transform);
     }
 }
 
 void RiveFileInstance::pointer_move(Vector2 position) {
-    if (state_machine) {
-        Vector2 local = to_local(position);
-        state_machine->pointerMove(rive::Vec2D(local.x, local.y));
+    if (rive_player.is_valid()) {
+        Transform2D xform = get_transform();
+        rive::Mat2D rive_transform(
+            xform.columns[0].x, xform.columns[0].y,
+            xform.columns[1].x, xform.columns[1].y,
+            xform.columns[2].x, xform.columns[2].y
+        );
+        rive_player->pointer_move(position, rive_transform);
     }
+}
+
+Ref<RiveViewModelInstance> RiveFileInstance::get_view_model_instance() const {
+    if (rive_player.is_valid()) {
+        return rive_player->get_rive_view_model_instance();
+    }
+    return nullptr;
 }

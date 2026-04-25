@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3 uid="uid://cfvbrsu1wcg1q"]
+
+[ext_resource type="RiveFile" uid="uid://b5h5jgce2twjq" path="res://godot.riv" id="1_fe0wy"]
+[ext_resource type="RiveFile" uid="uid://b8qwhah7ebpgi" path="res://juice.riv" id="1_yh86s"]
+[ext_resource type="RiveFile" uid="uid://cm48o8xl81jkt" path="res://icon2.svg" id="3_kh14r"]
+
+[node name="RiveCanvas2D" type="RiveCanvas2D" unique_id=1131139787]
+size = Vector2i(1920, 1080)
+
+[node name="RiveFileInstance3" type="RiveFileInstance" parent="." unique_id=263160593]
+rive_file = ExtResource("1_yh86s")
+position = Vector2(791, 62)
+
+[node name="RiveFileInstance" type="RiveFileInstance" parent="." unique_id=59139771]
+rive_file = ExtResource("1_fe0wy")
+position = Vector2(203, 310)
+rotation = 0.023250632
+
+[node name="RiveFileInstance2" type="RiveFileInstance" parent="." unique_id=1338611671]
+rive_file = ExtResource("3_kh14r")
+position = Vector2(534, 523)

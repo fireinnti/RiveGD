@@ -5,16 +5,21 @@
 #include <godot_cpp/godot.hpp>
 #include <godot_cpp/classes/engine.hpp>
 
-#include "rive_renderer.h"
+#include "renderer/rive_renderer.h"
 #include "rive_svg.h"
 #include "resources/rive_file.h"
 #include "resources/rive_types.h"
 #include "scene/rive_node.h"
 #include "scene/rive_file_instance.h"
+#include "scene/rive_multi_instance.h"
 #include "scene/rive_control.h"
 #include "scene/rive_canvas_2d.h"
 #include "scene/rive_raw.h"
+#include "scene/rive_player.h"
+#include "scene/rive_view_model.h"
+#include "renderer/rive_texture_target.h"
 #include "editor/rive_editor_plugin.h"
+#include "editor/rive_view_model_inspector.h"
 #include "editor/rive_file_instance_editor_plugin.h"
 #include <godot_cpp/classes/editor_plugin_registration.hpp>
 
@@ -31,14 +36,30 @@ void initialize_rive_module(ModuleInitializationLevel p_level) {
         ClassDB::register_class<RiveFile>();
         ClassDB::register_class<RiveNode>();
         ClassDB::register_class<RiveFileInstance>();
+        ClassDB::register_class<RiveMultiInstance>();
         ClassDB::register_class<RiveRaw>();
         ClassDB::register_class<RiveCanvas2D>();
         
+        ClassDB::register_class<RivePlayer>();
+        ClassDB::register_class<RiveTextureTarget>();
+        
+        ClassDB::register_abstract_class<RiveViewModelProperty>();
+        ClassDB::register_class<RiveViewModelNumber>();
+        ClassDB::register_class<RiveViewModelString>();
+        ClassDB::register_class<RiveViewModelBoolean>();
+        ClassDB::register_class<RiveViewModelColor>();
+        ClassDB::register_class<RiveViewModelEnum>();
+        ClassDB::register_class<RiveViewModelTrigger>();
+        ClassDB::register_class<RiveViewModelImage>();
+        ClassDB::register_class<RiveViewModelInstance>();
+
         // Initialize renderer
     }
     
     if (p_level == MODULE_INITIALIZATION_LEVEL_EDITOR) {
         ClassDB::register_class<RiveImportPlugin>();
+        ClassDB::register_class<RiveViewModelInspector>();
+        ClassDB::register_class<RiveInspectorPlugin>();
         ClassDB::register_class<RiveEditorPlugin>();
         ClassDB::register_class<RiveFileInstanceEditor>();
         ClassDB::register_class<RiveFileInstanceEditorPlugin>();
@@ -53,7 +74,7 @@ void initialize_rive() {
 
 void uninitialize_rive_module(ModuleInitializationLevel p_level) {
     if (p_level == MODULE_INITIALIZATION_LEVEL_SCENE) {
-        // Cleanup if needed
+        rive_integration::cleanup_rive_renderer();
     }
 }
 

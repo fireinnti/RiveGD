@@ -9,12 +9,10 @@
 #include <godot_cpp/classes/input_event_mouse_motion.hpp>
 #include <godot_cpp/classes/input_event_mouse_button.hpp>
 
-#include "rive_render_registry.h"
-#include <rive/file.hpp>
-#include <rive/artboard.hpp>
-#include <rive/animation/linear_animation_instance.hpp>
-#include <rive/animation/state_machine_instance.hpp>
-#include <rive/viewmodel/viewmodel_instance.hpp>
+#include "renderer/rive_render_registry.h"
+#include "rive_player.h"
+#include "../renderer/rive_texture_target.h"
+#include "../resources/rive_file.h"
 
 using namespace godot;
 
@@ -22,19 +20,10 @@ class RiveControl : public Control, public RiveDrawable
 {
     GDCLASS(RiveControl, Control);
 
-    String file_path;
-    rive::rcp<rive::File> rive_file;
-    std::unique_ptr<rive::ArtboardInstance> artboard;
-    std::unique_ptr<rive::LinearAnimationInstance> animation;
-    std::unique_ptr<rive::StateMachineInstance> state_machine;
-    rive::rcp<rive::ViewModelInstance> view_model_instance;
-
-    RID texture_rid;
-    Ref<Texture2DRD> texture_rd_ref; // Keep reference if using RD
-    Size2i texture_size;
-
-    String current_animation;
-    String current_state_machine;
+    Ref<RiveFile> rive_file;
+    Ref<RivePlayer> rive_player;
+    Ref<RiveTextureTarget> texture_target;
+    Dictionary property_values;
 
     struct RiveProperty
     {
@@ -43,7 +32,7 @@ class RiveControl : public Control, public RiveDrawable
         bool is_trigger = false;
         String enum_hint;
     };
-    Vector<RiveProperty> rive_properties;
+    // Vector<RiveProperty> rive_properties; // Removed, handled by InspectorPlugin
 
 protected:
     static void _bind_methods();
@@ -53,19 +42,24 @@ protected:
     void _get_property_list(List<PropertyInfo> *p_list) const;
     void _validate_property(PropertyInfo &p_property) const;
 
-    void _update_property_list();
-    void _collect_view_model_properties(rive::ViewModelInstance *vm, String prefix);
+    // void _update_property_list(); // Removed
+    // void _collect_view_model_properties(rive::ViewModelInstance *vm, String prefix); // Removed
 
     // Internal helper
     void _render_rive();
     rive::Mat2D _get_rive_transform() const;
+    void _apply_property_values();
+    void _on_rive_file_changed();
 
 public:
     RiveControl();
     ~RiveControl();
 
-    void set_file_path(const String &p_path);
-    String get_file_path() const;
+    void set_rive_file(const Ref<RiveFile> &p_file);
+    Ref<RiveFile> get_rive_file() const;
+
+    void set_property_values(const Dictionary &p_values);
+    Dictionary get_property_values() const;
 
     void load_file();
 
@@ -93,6 +87,9 @@ public:
     void fire_trigger(const String &p_property_path);
     void set_enum_value(const String &p_property_path, int p_value);
     void set_color_value(const String &p_property_path, Color p_value);
+
+    Ref<RiveViewModelInstance> get_view_model_instance() const;
+    Ref<RivePlayer> get_rive_player() const { return rive_player; }
 };
 
 #endif // RIVE_CONTROL_H

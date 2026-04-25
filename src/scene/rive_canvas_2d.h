@@ -3,7 +3,10 @@
 
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/texture2drd.hpp>
-#include "../rive_render_registry.h"
+#include <godot_cpp/templates/local_vector.hpp>
+#include "../renderer/rive_render_registry.h"
+#include "../renderer/rive_texture_target.h"
+#include "rive_node.h"
 #include <rive/renderer.hpp>
 
 using namespace godot;
@@ -12,9 +15,13 @@ class RiveCanvas2D : public Node2D, public RiveDrawable {
     GDCLASS(RiveCanvas2D, Node2D);
 
 private:
-    Ref<Texture2DRD> texture_rd;
-    RID texture_rid;
+    Ref<RiveTextureTarget> texture_target;
     Vector2i size = Vector2i(512, 512);
+    
+    LocalVector<RiveNode*> active_nodes;
+    double current_delta = 0.0;
+
+    void _advance_node(uint32_t p_index);
 
 protected:
     static void _bind_methods();
@@ -26,11 +33,11 @@ public:
 
     void set_size(const Vector2i &p_size);
     Vector2i get_size() const;
+    
+    Ref<Texture2D> get_texture() const;
 
-    // RiveDrawable implementation
     void draw(rive::Renderer *renderer) override;
     
-    // Godot overrides
     void _process(double delta) override;
     void _draw() override;
 };

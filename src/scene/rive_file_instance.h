@@ -3,9 +3,7 @@
 
 #include "rive_node.h"
 #include "../resources/rive_file.h"
-#include <rive/artboard.hpp>
-#include <rive/animation/state_machine_instance.hpp>
-#include <rive/animation/linear_animation_instance.hpp>
+#include "rive_player.h"
 
 using namespace godot;
 
@@ -14,9 +12,7 @@ class RiveFileInstance : public RiveNode {
 
 private:
     Ref<RiveFile> rive_file_resource;
-    std::unique_ptr<rive::ArtboardInstance> artboard;
-    std::unique_ptr<rive::StateMachineInstance> state_machine;
-    std::unique_ptr<rive::LinearAnimationInstance> animation;
+    Ref<RivePlayer> rive_player;
     
     String artboard_name;
     String state_machine_name;
@@ -49,27 +45,21 @@ public:
     void set_auto_play(bool p_auto);
     bool get_auto_play() const;
 
-    // Called by RiveCanvasLayer
     void advance(double delta) override;
     void draw(rive::Renderer *renderer) override;
-    
-    // Hit testing
-    bool hit_test(Vector2 point);
-    
-    
+    Rect2 get_rive_bounds() const override;
+
     // Editor integration
-    Rect2 _edit_get_rect() const;
-    bool _edit_use_rect() const;
-    Rect2 get_rect() const;
-    
-    // Godot overrides
     void _draw() override;
     void _input(const Ref<InputEvent> &p_event) override;
     
-    // Input handling
+    bool hit_test(Vector2 point);
+
     void pointer_down(Vector2 position) override;
     void pointer_up(Vector2 position) override;
     void pointer_move(Vector2 position) override;
+
+    Ref<RiveViewModelInstance> get_view_model_instance() const;
 };
 
 #endif

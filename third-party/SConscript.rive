@@ -220,6 +220,7 @@ else:
 
 # Platform specific flags
 if rive_env["platform"] == "macos":
+    rive_env.Append(CCFLAGS=["-fobjc-arc"])
     rive_env.Append(FRAMEWORKS=["Metal", "Foundation", "QuartzCore", "AppKit", "CoreGraphics", "CoreText", "AudioToolbox"])
     rive_env.Append(CPPDEFINES=["RIVE_METAL"])
 elif rive_env["platform"] in ["windows", "linuxbsd", "android"]:
@@ -240,7 +241,10 @@ elif rive_env["platform"] in ["windows", "linuxbsd", "android"]:
         rive_env.Append(CXXFLAGS=["/std:c++20"])
         
         # Link system libraries
-        rive_env.Append(LIBS=["d3d12", "dxgi", "d3dcompiler", "opengl32", "vulkan-1", "dxguid", "uuid"])
+        rive_env.Append(LIBS=["d3d12", "dxgi", "d3dcompiler", "opengl32", "vulkan-1", "dxguid", "uuid", "delayimp"])
+        
+        # Delay load Vulkan to avoid crash if missing
+        rive_env.Append(LINKFLAGS=["/DELAYLOAD:vulkan-1.dll"])
 
         # Prioritize Godot build deps for D3DX12
         local_app_data = os.environ.get("LOCALAPPDATA")
@@ -298,18 +302,9 @@ for d in dirs_to_scan:
                 if f == "load_gles_extensions.cpp" and rive_env["platform"] != "android":
                     continue
                 
-                if f == "render_context_gl_impl.cpp":
-                    continue
-                if f == "render_buffer_gl_impl.cpp":
-                    continue
                 rive_sources.append(os.path.join(root, f))
 
-# Add patched files from the main project
-# We need to go up two levels to get to the root of the repo
-repo_root = os.path.dirname(os.path.dirname(rive_dir))
-patches_dir = os.path.join(repo_root, "src", "patches")
-rive_sources.append(os.path.join(patches_dir, "render_context_gl_impl.cpp"))
-rive_sources.append(os.path.join(patches_dir, "render_buffer_gl_impl.cpp"))
+
 
 
 # On macOS exclude D3D12 renderer source(s) that live in the project `src/` directory.
