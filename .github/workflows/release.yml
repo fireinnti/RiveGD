@@ -9,11 +9,16 @@ on:
         description: "Optional tag to attach artifacts to (must already exist as a release). Leave blank for artifact-only run."
         required: false
         default: ""
+      platforms:
+        description: "Which platforms to build (comma-separated subset of: macos,windows,linux). Default: all."
+        required: false
+        default: "all"
 
 jobs:
   build:
     name: ${{ matrix.config.name }} (${{ matrix.target }})
     runs-on: ${{ matrix.config.runner }}
+    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, matrix.config.platform)
     strategy:
       fail-fast: false
       matrix:
