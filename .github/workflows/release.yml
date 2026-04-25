@@ -15,30 +15,38 @@ on:
         default: "all"
 
 jobs:
+  setup:
+    name: Resolve build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - id: gen
+        shell: bash
+        env:
+          PLATFORMS: ${{ github.event_name == 'workflow_dispatch' && inputs.platforms || 'all' }}
+        run: |
+          all='[
+            {"name":"macos-universal","runner":"macos-14","platform":"macos","shader_platform":"macos","arch":"universal"},
+            {"name":"windows-x86_64","runner":"windows-2022","platform":"windows","shader_platform":"windows","arch":"x86_64"},
+            {"name":"linux-x86_64","runner":"ubuntu-22.04","platform":"linux","shader_platform":"linuxbsd","arch":"x86_64"}
+          ]'
+          if [ "$PLATFORMS" = "all" ]; then
+            filtered="$all"
+          else
+            filtered=$(echo "$all" | python3 -c "import json,sys,os; sel=set(s.strip() for s in os.environ['PLATFORMS'].split(',') if s.strip()); print(json.dumps([c for c in json.load(sys.stdin) if c['platform'] in sel]))")
+          fi
+          echo "matrix=$(echo "$filtered" | tr -d '\n' | tr -s ' ')" >> "$GITHUB_OUTPUT"
+
   build:
     name: ${{ matrix.config.name }} (${{ matrix.target }})
+    needs: setup
     runs-on: ${{ matrix.config.runner }}
-    if: github.event_name != 'workflow_dispatch' || inputs.platforms == 'all' || contains(inputs.platforms, matrix.config.platform)
     strategy:
       fail-fast: false
       matrix:
         target: [template_debug, template_release]
-        config:
-          - name: macos-universal
-            runner: macos-14
-            platform: macos
-            shader_platform: macos
-            arch: universal
-          - name: windows-x86_64
-            runner: windows-2022
-            platform: windows
-            shader_platform: windows
-            arch: x86_64
-          - name: linux-x86_64
-            runner: ubuntu-22.04
-            platform: linux
-            shader_platform: linuxbsd
-            arch: x86_64
+        config: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     steps:
       - name: Checkout
