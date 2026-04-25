@@ -1135,6 +1135,7 @@ void RiveText::_bind_methods() {
     ClassDB::bind_method(D_METHOD("append_run", "text", "font", "paint", "size", "line_height", "letter_spacing"), &RiveText::append_run);
     ClassDB::bind_method(D_METHOD("render", "renderer", "override_paint"), &RiveText::render);
     ClassDB::bind_method(D_METHOD("get_bounds"), &RiveText::get_bounds);
+    ClassDB::bind_method(D_METHOD("shape_glyphs"), &RiveText::shape_glyphs);
     ClassDB::bind_method(D_METHOD("set_sizing", "v"), &RiveText::set_sizing);
     ClassDB::bind_method(D_METHOD("set_overflow", "v"), &RiveText::set_overflow);
     ClassDB::bind_method(D_METHOD("set_align", "v"), &RiveText::set_align);
@@ -1177,6 +1178,9 @@ void RiveText::clear() {
     if (raw_text) raw_text->clear();
     run_paints.clear();
     run_fonts.clear();
+    run_texts.clear();
+    run_sizes.clear();
+    run_letter_spacings.clear();
 }
 
 void RiveText::append_run(String text, Ref<RiveFont> p_font, Ref<RivePaint> p_paint, float size, float line_height, float letter_spacing) {
@@ -1205,6 +1209,9 @@ void RiveText::append_run(String text, Ref<RiveFont> p_font, Ref<RivePaint> p_pa
     std::string std_text = std::string(text.utf8().get_data());
     raw_text->append(std_text, paint_rcp, p_font->get_font(), size, line_height, letter_spacing);
     run_fonts.push_back(p_font);
+    run_texts.push_back(text);
+    run_sizes.push_back(size);
+    run_letter_spacings.push_back(letter_spacing);
     if (p_paint.is_valid()) run_paints.push_back(p_paint);
 }
 
@@ -1226,6 +1233,88 @@ Rect2 RiveText::get_bounds() {
     if (!raw_text) return Rect2();
     rive::AABB b = raw_text->bounds();
     return Rect2(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
+}
+
+Array RiveText::shape_glyphs() {
+    Array out;
+    if (run_texts.size() == 0) return out;
+
+    // Concatenate all runs into one Unichar array and build matching TextRun
+    // metadata.
+    std::vector<rive::Unichar> unichars;
+    std::vector<rive::TextRun> runs;
+    runs.reserve(run_texts.size());
+    int paint_idx = 0;
+    for (int i = 0; i < run_texts.size(); i++) {
+        const String& s = run_texts[i];
+        Ref<RiveFont> rf = run_fonts[i];
+        if (rf.is_null() || !rf->is_loaded() || s.length() == 0) continue;
+        uint32_t start_count = (uint32_t)unichars.size();
+        for (int j = 0; j < s.length(); j++) {
+            unichars.push_back((rive::Unichar)s[j]);
+        }
+        rive::TextRun r;
+        r.font = rf->get_font();
+        r.size = run_sizes[i];
+        r.lineHeight = -1.0f;
+        r.letterSpacing = run_letter_spacings[i];
+        r.unicharCount = (uint32_t)unichars.size() - start_count;
+        r.script = 0;
+        r.styleId = (uint16_t)i;
+        r.level = 0;
+        runs.push_back(r);
+    }
+    if (runs.empty() || unichars.empty()) return out;
+
+    rive::rcp<rive::Font> shaper_font = runs[0].font;
+    rive::SimpleArray<rive::Paragraph> paragraphs = shaper_font->shapeText(
+        rive::Span<const rive::Unichar>(unichars.data(), unichars.size()),
+        rive::Span<const rive::TextRun>(runs.data(), runs.size()));
+
+    for (size_t pi = 0; pi < paragraphs.size(); pi++) {
+        const rive::Paragraph& para = paragraphs[pi];
+        for (size_t ri = 0; ri < para.runs.size(); ri++) {
+            const rive::GlyphRun& gr = para.runs[ri];
+            // Resolve which RivePaint to associate with this glyph run.
+            Ref<RivePaint> paint_for_run;
+            if ((int)gr.styleId < run_paints.size()) {
+                paint_for_run = run_paints[gr.styleId];
+            }
+            float run_size = gr.size;
+            for (size_t gi = 0; gi < gr.glyphs.size(); gi++) {
+                rive::GlyphID gid = gr.glyphs[gi];
+                rive::RawPath glyph_path = gr.font->getPath(gid);
+                float gx = gr.xpos[gi] + gr.offsets[gi].x;
+                float gy = gr.offsets[gi].y;
+                Ref<RivePath> rp;
+                rp.instantiate();
+                for (auto it = glyph_path.begin(); it != glyph_path.end(); ++it) {
+                    rive::PathVerb verb = it.verb();
+                    const rive::Vec2D* p = it.pts();
+                    auto tx = [&](const rive::Vec2D& v) -> rive::Vec2D {
+                        return { v.x * run_size + gx, v.y * run_size + gy };
+                    };
+                    switch (verb) {
+                        case rive::PathVerb::move:   { auto a = tx(p[0]); rp->move_to(a.x, a.y); break; }
+                        case rive::PathVerb::line:   { auto a = tx(p[1]); rp->line_to(a.x, a.y); break; }
+                        case rive::PathVerb::quad:   { auto a = tx(p[1]); auto b = tx(p[2]); rp->quad_to(a.x, a.y, b.x, b.y); break; }
+                        case rive::PathVerb::cubic:  { auto a = tx(p[1]); auto b = tx(p[2]); auto c = tx(p[3]); rp->cubic_to(a.x, a.y, b.x, b.y, c.x, c.y); break; }
+                        case rive::PathVerb::close:  rp->close(); break;
+                    }
+                }
+                Dictionary entry;
+                entry["path"] = rp;
+                entry["paint"] = paint_for_run;
+                entry["x"] = gx;
+                entry["y"] = gy;
+                entry["advance"] = gi + 1 < gr.xpos.size() ? (gr.xpos[gi + 1] - gr.xpos[gi]) : 0.0f;
+                entry["glyph_id"] = (int)gid;
+                out.push_back(entry);
+            }
+            (void)paint_idx;
+        }
+    }
+    return out;
 }
 
 void RiveText::set_sizing(int v)            { sizing = v; _ensure_raw_text(); if (raw_text) raw_text->sizing((rive::TextSizing)v); }

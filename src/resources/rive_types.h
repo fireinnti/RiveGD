@@ -199,6 +199,9 @@ private:
     // Hold refs so paints/fonts stay alive across frames.
     Vector<Ref<RivePaint>> run_paints;
     Vector<Ref<RiveFont>> run_fonts;
+    Vector<String> run_texts;
+    Vector<float> run_sizes;
+    Vector<float> run_letter_spacings;
     int sizing = 0;       // autoWidth / autoHeight / fixed
     int overflow = 0;     // visible / hidden / clipped / ellipsis / fit
     int align = 0;        // left / right / center
@@ -221,6 +224,10 @@ public:
     void append_run(String text, Ref<RiveFont> font, Ref<RivePaint> paint, float size, float line_height, float letter_spacing);
     void render(Ref<RiveRendererWrapper> renderer, Ref<RivePaint> override_paint);
     Rect2 get_bounds();
+    // Re-shape all stored runs on a single baseline and return per-glyph data:
+    // [{path: RivePath, paint: RivePaint, x, y, advance, glyph_id}]. Useful for
+    // GDScript-side morphing/warping. Ignores wrap/align/sizing.
+    Array shape_glyphs();
 
     void set_sizing(int v);
     void set_overflow(int v);
