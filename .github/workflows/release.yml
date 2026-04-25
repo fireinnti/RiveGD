@@ -12,28 +12,25 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.name }} (${{ matrix.target }})
-    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.config.name }} (${{ matrix.target }})
+    runs-on: ${{ matrix.config.runner }}
     strategy:
       fail-fast: false
       matrix:
         target: [template_debug, template_release]
-        include:
+        config:
           - name: macos-universal
             runner: macos-14
             platform: macos
             arch: universal
-            artifact_glob: project/addons/godot-rive/bin/libgodot-rive.macos.*.framework
           - name: windows-x86_64
             runner: windows-2022
             platform: windows
             arch: x86_64
-            artifact_glob: project/addons/godot-rive/bin/libgodot-rive.windows.*.x86_64.*
           - name: linux-x86_64
             runner: ubuntu-22.04
             platform: linux
             arch: x86_64
-            artifact_glob: project/addons/godot-rive/bin/libgodot-rive.linux.*.x86_64.so
 
     steps:
       - name: Checkout
@@ -52,14 +49,14 @@ jobs:
 
       # Linux deps: OpenGL / X11 headers used by godot-cpp + Rive's GL backend.
       - name: Install Linux build deps
-        if: matrix.platform == 'linux'
+        if: matrix.config.platform == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libgl1-mesa-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev
 
       # Windows: enable MSVC + ensure fxc.exe (Windows SDK) is on PATH for shader build.
       - name: Setup MSVC
-        if: matrix.platform == 'windows'
+        if: matrix.config.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
@@ -67,7 +64,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          scons platform=${{ matrix.platform }} target=${{ matrix.target }} arch=${{ matrix.arch }} -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+          scons platform=${{ matrix.config.platform }} target=${{ matrix.target }} arch=${{ matrix.config.arch }} -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
 
       - name: Stage artifacts
         shell: bash
@@ -82,7 +79,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: godot-rive-${{ matrix.name }}-${{ matrix.target }}
+          name: godot-rive-${{ matrix.config.name }}-${{ matrix.target }}
           path: staged/**
           if-no-files-found: error
           retention-days: 14
