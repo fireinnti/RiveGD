@@ -73,6 +73,14 @@ jobs:
           cache: true
           stripdown: true
 
+      # DirectX-Headers (provides d3dx12.h) for the Rive D3D12 renderer.
+      - name: Fetch DirectX-Headers (Windows)
+        if: matrix.config.platform == 'windows'
+        shell: bash
+        run: |
+          git clone --depth 1 --branch v1.614.0 https://github.com/microsoft/DirectX-Headers.git "$RUNNER_TEMP/DirectX-Headers"
+          echo "DIRECTX_HEADERS_PATH=$RUNNER_TEMP/DirectX-Headers" >> "$GITHUB_ENV"
+
       - name: Generate Rive shaders
         shell: bash
         run: |
