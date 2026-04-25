@@ -21,7 +21,6 @@ void RiveFileInstance::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_auto_play", "auto_play"), &RiveFileInstance::set_auto_play);
     ClassDB::bind_method(D_METHOD("get_auto_play"), &RiveFileInstance::get_auto_play);
     ClassDB::bind_method(D_METHOD("get_view_model_instance"), &RiveFileInstance::get_view_model_instance);
-    ClassDB::bind_method(D_METHOD("_input", "event"), &RiveFileInstance::_input);
 
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "rive_file", PROPERTY_HINT_RESOURCE_TYPE, "RiveFile"), "set_rive_file", "get_rive_file");
     ADD_PROPERTY(PropertyInfo(Variant::STRING, "artboard_name"), "set_artboard_name", "get_artboard_name");
@@ -100,8 +99,10 @@ void RiveFileInstance::_load_artboard() {
     if (!artboard) return;
 
     rive::rcp<rive::File> file;
-    if (rive_file_resource->get_rive_file()) {
-        file = rive::rcp<rive::File>(rive_file_resource->get_rive_file());
+    if (rive::File* raw = rive_file_resource->get_rive_file()) {
+        // safe_ref before adopting into rcp (rcp(T*) does not increment refcount)
+        raw->ref();
+        file = rive::rcp<rive::File>(raw);
     }
 
     rive_player->set_artboard(std::move(artboard), file);
@@ -151,6 +152,8 @@ void RiveFileInstance::_draw() {
 }
 
 void RiveFileInstance::_input(const Ref<InputEvent> &p_event) {
+    if (Engine::get_singleton()->is_editor_hint()) return;
+    if (!is_inside_tree()) return;
     Ref<InputEventMouseButton> mb = p_event;
     if (mb.is_valid()) {
         if (mb->is_pressed()) {

@@ -1,6 +1,7 @@
 #include "rive_control.h"
 #include "../renderer/rive_renderer.h"
 #include "../rive_constants.h"
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/file_access.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
@@ -81,6 +82,7 @@ void RiveControl::_notification(int p_what)
     case NOTIFICATION_RESIZED:
         break;
     case NOTIFICATION_DRAW:
+        if (!is_inside_tree()) break;
         if (texture_target.is_valid())
         {
             if (texture_target->get_texture_rd().is_valid())
@@ -94,6 +96,7 @@ void RiveControl::_notification(int p_what)
         }
         break;
     case NOTIFICATION_PROCESS:
+        if (!is_inside_tree()) break;
         if (rive_player.is_valid())
         {
             float delta = get_process_delta_time();

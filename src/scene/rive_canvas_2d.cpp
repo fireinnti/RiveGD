@@ -2,6 +2,7 @@
 #include "rive_node.h"
 #include "../renderer/rive_renderer.h"
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/rendering_server.hpp>
 #include <godot_cpp/classes/rendering_device.hpp>
 #include <godot_cpp/classes/worker_thread_pool.hpp>
@@ -69,14 +70,23 @@ void RiveCanvas2D::_process(double delta) {
 
     if (active_nodes.size() > 0) {
         current_delta = delta;
-        int64_t group_id = WorkerThreadPool::get_singleton()->add_group_task(Callable(this, "_advance_node"), active_nodes.size(), -1, true, "RiveCanvas2D Advance");
-        WorkerThreadPool::get_singleton()->wait_for_group_task_completion(group_id);
+        // In the editor, skip WorkerThreadPool to avoid race conditions with
+        // file scanning and resource reloading (node ptrs may become invalid)
+        if (Engine::get_singleton()->is_editor_hint()) {
+            for (uint32_t i = 0; i < (uint32_t)active_nodes.size(); i++) {
+                _advance_node(i);
+            }
+        } else {
+            int64_t group_id = WorkerThreadPool::get_singleton()->add_group_task(Callable(this, "_advance_node"), active_nodes.size(), -1, true, "RiveCanvas2D Advance");
+            WorkerThreadPool::get_singleton()->wait_for_group_task_completion(group_id);
+        }
     }
     
     queue_redraw();
 }
 
 void RiveCanvas2D::_draw() {
+    if (!is_inside_tree()) return;
     if (size.x <= 0 || size.y <= 0) return;
     if (!texture_target.is_valid()) return;
 
@@ -85,6 +95,7 @@ void RiveCanvas2D::_draw() {
     RenderingServer *rs = RenderingServer::get_singleton();
     if (!rs) return;
     RenderingDevice *rd = rs->get_rendering_device();
+    if (!rd) return;
 
     rive_integration::render_texture(rd, texture_target->get_texture_rid(), this, size.x, size.y);
 

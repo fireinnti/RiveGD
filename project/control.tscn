@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://bxee2li5y334x"]
 
+[ext_resource type="RiveFile" uid="uid://b5h5jgce2twjq" path="res://godot.riv" id="1_0fbet"]
+
 [node name="Control" type="Control" unique_id=2103102571]
 layout_mode = 3
 anchors_preset = 15
@@ -9,8 +11,8 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="RiveControl" type="RiveControl" parent="." unique_id=715367300]
-file_path = "uid://b8qwhah7ebpgi"
-animation_name = "walk"
+rive_file = ExtResource("1_0fbet")
+state_machine_name = "State Machine 1"
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
