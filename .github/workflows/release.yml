@@ -64,39 +64,42 @@ jobs:
         with:
           arch: x64
 
-      # Vulkan SDK on Windows (provides glslangValidator + spirv-opt for SPIR-V build).
-      - name: Install Vulkan SDK (Windows)
-        if: matrix.config.platform == 'windows'
+      # Vulkan SDK on Windows/Linux (Rive needs Vulkan headers >= 1.4.318 for VK_ARM_format_pack).
+      - name: Install Vulkan SDK
+        if: matrix.config.platform == 'windows' || matrix.config.platform == 'linux'
         uses: jakoch/install-vulkan-sdk-action@v1
         with:
-          vulkan_version: 1.3.296.0
+          vulkan_version: 1.4.321.1
           install_runtime: false
           cache: true
           stripdown: false
 
-      - name: Verify Vulkan SDK headers (Windows)
-        if: matrix.config.platform == 'windows'
+      - name: Verify Vulkan SDK headers
+        if: matrix.config.platform == 'windows' || matrix.config.platform == 'linux'
         shell: bash
         run: |
           echo "VULKAN_SDK=$VULKAN_SDK"
-          ls "$VULKAN_SDK/Include/vulkan/vulkan.h"
+          ls "$VULKAN_SDK/Include/vulkan/vulkan.h" 2>/dev/null || ls "$VULKAN_SDK/include/vulkan/vulkan.h"
 
       # Vulkan Memory Allocator (header-only) — Rive's vulkan backend includes vk_mem_alloc.h.
-      - name: Fetch VulkanMemoryAllocator (Windows)
-        if: matrix.config.platform == 'windows'
+      - name: Fetch VulkanMemoryAllocator
+        if: matrix.config.platform == 'windows' || matrix.config.platform == 'linux'
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/vma/include/vma"
           curl -fsSL -o "$RUNNER_TEMP/vma/include/vk_mem_alloc.h" \
             https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/v3.1.0/include/vk_mem_alloc.h
-          # Also copy to vma/ subdir to match SConscript.rive's Include/vma path.
           cp "$RUNNER_TEMP/vma/include/vk_mem_alloc.h" "$RUNNER_TEMP/vma/include/vma/vk_mem_alloc.h"
-          # Ensure SConscript.rive (which adds $VULKAN_SDK/Include and $VULKAN_SDK/Include/vma to CPPPATH)
-          # can find the header by placing it inside the SDK's Include directory.
-          mkdir -p "$VULKAN_SDK/Include/vma"
-          cp "$RUNNER_TEMP/vma/include/vk_mem_alloc.h" "$VULKAN_SDK/Include/vk_mem_alloc.h"
-          cp "$RUNNER_TEMP/vma/include/vk_mem_alloc.h" "$VULKAN_SDK/Include/vma/vk_mem_alloc.h"
-          ls "$VULKAN_SDK/Include/vk_mem_alloc.h"
+          # Place the header inside the SDK's include directory so SConscript.rive picks it up.
+          # Windows uses 'Include', Linux uses 'include'.
+          for inc in "$VULKAN_SDK/Include" "$VULKAN_SDK/include"; do
+            if [ -d "$inc" ]; then
+              mkdir -p "$inc/vma"
+              cp "$RUNNER_TEMP/vma/include/vk_mem_alloc.h" "$inc/vk_mem_alloc.h"
+              cp "$RUNNER_TEMP/vma/include/vk_mem_alloc.h" "$inc/vma/vk_mem_alloc.h"
+              ls "$inc/vk_mem_alloc.h"
+            fi
+          done
 
       # DirectX-Headers (provides d3dx12.h) for the Rive D3D12 renderer.
       - name: Fetch DirectX-Headers (Windows)

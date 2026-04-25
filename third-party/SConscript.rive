@@ -231,17 +231,24 @@ if rive_env["platform"] == "macos":
     rive_env.Append(CPPDEFINES=["RIVE_METAL"])
 elif rive_env["platform"] in ["windows", "linuxbsd", "android"]:
     rive_env.Append(CPPDEFINES=["RIVE_VULKAN", "RIVE_UPSTREAM_VULKAN_IMPL", "VULKAN_ENABLED"])
-    if rive_env["platform"] == "windows":
-        vulkan_sdk = os.environ.get("VULKAN_SDK")
-        if vulkan_sdk:
-            rive_env.Append(CPPPATH=[
-                os.path.join(vulkan_sdk, "Include"),
-                os.path.join(vulkan_sdk, "Include", "vma")
-            ])
-            rive_env.Append(LIBPATH=[
-                os.path.join(vulkan_sdk, "Lib")
-            ])
 
+    # Pick up VULKAN_SDK headers on Windows + Linux (LunarG ships modern Vulkan headers
+    # the system packages may be too old for, e.g. VK_ARM_format_pack added in 1.4.318).
+    vulkan_sdk = os.environ.get("VULKAN_SDK")
+    if vulkan_sdk and rive_env["platform"] in ["windows", "linuxbsd"]:
+        # LunarG SDK uses 'Include' on Windows, 'include' on Linux.
+        for inc_name in ("Include", "include"):
+            inc_dir = os.path.join(vulkan_sdk, inc_name)
+            if os.path.isdir(inc_dir):
+                rive_env.Prepend(CPPPATH=[inc_dir, os.path.join(inc_dir, "vma")])
+                break
+        for lib_name in ("Lib", "lib"):
+            lib_dir = os.path.join(vulkan_sdk, lib_name)
+            if os.path.isdir(lib_dir):
+                rive_env.Append(LIBPATH=[lib_dir])
+                break
+
+    if rive_env["platform"] == "windows":
         # D3D12 configuration (Windows only)
         rive_env.Append(CPPDEFINES=["RIVE_D3D12", "D3D12_ENABLED", "_USE_MATH_DEFINES", "NOMINMAX"])
         rive_env.Append(CXXFLAGS=["/std:c++20"])
