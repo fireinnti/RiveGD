@@ -78,13 +78,36 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y glslang-tools spirv-tools
 
-      # Verify the pre-installed NDK 28 toolchain is usable.
-      - name: Verify Android NDK 28 toolchain
+      # Verify the pre-installed NDK toolchain is usable.
+      - name: Verify Android NDK toolchain
         if: matrix.config.platform == 'android'
         shell: bash
         run: |
           echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT}"
           ls "${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/" | head -5
+
+      # Fetch modern Vulkan headers (NDK sysroot lacks VK_ARM_format_pack added in 1.4.318)
+      # and VulkanMemoryAllocator. Expose them as a synthetic VULKAN_SDK so SConscript.rive
+      # prepends them to CPPPATH, overriding the NDK's stale vulkan_core.h.
+      - name: Fetch Vulkan headers and VMA for Android
+        if: matrix.config.platform == 'android'
+        shell: bash
+        run: |
+          ANDROID_VULKAN_SDK="$RUNNER_TEMP/android-vulkan-sdk"
+          mkdir -p "${ANDROID_VULKAN_SDK}/include"
+          # Vulkan-Headers 1.4.321 (adds VK_ARM_format_pack enums missing from NDK sysroot)
+          curl -fsSL "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/v1.4.321.tar.gz" \
+            -o "$RUNNER_TEMP/vulkan-headers.tar.gz"
+          tar -xzf "$RUNNER_TEMP/vulkan-headers.tar.gz" -C "$RUNNER_TEMP"
+          cp -r "$RUNNER_TEMP/Vulkan-Headers-1.4.321/include/"* "${ANDROID_VULKAN_SDK}/include/"
+          # VulkanMemoryAllocator (header-only)
+          curl -fsSL -o "${ANDROID_VULKAN_SDK}/include/vk_mem_alloc.h" \
+            "https://raw.githubusercontent.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator/v3.1.0/include/vk_mem_alloc.h"
+          mkdir -p "${ANDROID_VULKAN_SDK}/include/vma"
+          cp "${ANDROID_VULKAN_SDK}/include/vk_mem_alloc.h" "${ANDROID_VULKAN_SDK}/include/vma/"
+          echo "VULKAN_SDK=${ANDROID_VULKAN_SDK}" >> "$GITHUB_ENV"
+          echo "Android Vulkan SDK ready:"
+          ls "${ANDROID_VULKAN_SDK}/include/"
 
       # Windows: enable MSVC + ensure fxc.exe (Windows SDK) is on PATH for shader build.
       - name: Setup MSVC

@@ -238,7 +238,7 @@ elif rive_env["platform"] in ["windows", "linuxbsd", "android"]:
     # Pick up VULKAN_SDK headers on Windows + Linux (LunarG ships modern Vulkan headers
     # the system packages may be too old for, e.g. VK_ARM_format_pack added in 1.4.318).
     vulkan_sdk = os.environ.get("VULKAN_SDK")
-    if vulkan_sdk and rive_env["platform"] in ["windows", "linuxbsd"]:
+    if vulkan_sdk and rive_env["platform"] in ["windows", "linuxbsd", "android"]:
         # LunarG SDK uses 'Include' on Windows, 'include' on Linux.
         for inc_name in ("Include", "include"):
             inc_dir = os.path.join(vulkan_sdk, inc_name)
