@@ -329,6 +329,12 @@ for d in dirs_to_scan:
                 if f == "load_gles_extensions.cpp" and rive_env["platform"] != "android":
                     continue
                 
+                # pls_impl_webgl.cpp uses ANGLE/WebGL extensions that don't exist on
+                # any native platform (Android, desktop, etc.).  It is only valid for
+                # Emscripten / WebGL builds which this project does not support.
+                if f == "pls_impl_webgl.cpp":
+                    continue
+                
                 rive_sources.append(os.path.join(root, f))
 
 
