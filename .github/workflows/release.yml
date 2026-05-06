@@ -10,7 +10,7 @@ on:
         required: false
         default: ""
       platforms:
-        description: "Which platforms to build (comma-separated subset of: macos,windows,linux). Default: all."
+        description: "Which platforms to build (comma-separated subset of: macos,windows,linux,android). Default: all."
         required: false
         default: "all"
 
@@ -29,7 +29,8 @@ jobs:
           all='[
             {"name":"macos-universal","runner":"macos-14","platform":"macos","shader_platform":"macos","arch":"universal"},
             {"name":"windows-x86_64","runner":"windows-2022","platform":"windows","shader_platform":"windows","arch":"x86_64"},
-            {"name":"linux-x86_64","runner":"ubuntu-22.04","platform":"linux","shader_platform":"linuxbsd","arch":"x86_64"}
+            {"name":"linux-x86_64","runner":"ubuntu-22.04","platform":"linux","shader_platform":"linuxbsd","arch":"x86_64"},
+            {"name":"android-arm64","runner":"ubuntu-22.04","platform":"android","shader_platform":"linuxbsd","arch":"arm64"}
           ]'
           if [ "$PLATFORMS" = "all" ]; then
             filtered="$all"
@@ -69,6 +70,24 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential libgl1-mesa-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev glslang-tools spirv-tools
+
+      # Android: install shader compilation tools and locate the NDK.
+      - name: Install Android build deps
+        if: matrix.config.platform == 'android'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools spirv-tools
+
+      - name: Setup Android NDK
+        if: matrix.config.platform == 'android'
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT}"
+          if [ -z "${ANDROID_NDK_ROOT}" ]; then
+            NDK_PATH=$(ls -d ${ANDROID_SDK_ROOT}/ndk/* 2>/dev/null | sort -V | tail -1)
+            echo "ANDROID_NDK_ROOT=${NDK_PATH}" >> "$GITHUB_ENV"
+            echo "Found NDK at: ${NDK_PATH}"
+          fi
 
       # Windows: enable MSVC + ensure fxc.exe (Windows SDK) is on PATH for shader build.
       - name: Setup MSVC

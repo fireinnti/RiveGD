@@ -180,7 +180,7 @@ rive_env.Append(CPPPATH=[
 ])
 
 rive_env.Append(CPPDEFINES=[
-    '_RIVE_INTERNAL_', 'RIVE_DESKTOP_GL', 'WITH_RIVE_TEXT', 'WITH_RIVE_TOOLS',
+    '_RIVE_INTERNAL_', 'WITH_RIVE_TEXT', 'WITH_RIVE_TOOLS',
     'WITH_RIVE_LAYOUT', 'YOGA_EXPORT=',
     'WITH_RIVE_AUDIO', 'MA_NO_RESOURCE_MANAGER',
     'RIVE_PNG', 'RIVE_JPEG', 'RIVE_WEBP', 'RIVE_DECODERS',
@@ -203,6 +203,9 @@ rive_env.Append(CPPDEFINES=[
     'HB_NO_META',
     'SB_CONFIG_UNITY'
 ])
+# Desktop GL is not available on Android; Vulkan is used there instead.
+if rive_env["platform"] != "android":
+    rive_env.Append(CPPDEFINES=['RIVE_DESKTOP_GL'])
 
 # Suppress warnings for third-party dependencies
 if rive_env["platform"] != "windows":
