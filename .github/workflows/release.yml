@@ -149,7 +149,15 @@ jobs:
       - name: Build
         shell: bash
         run: |
-          scons platform=${{ matrix.config.platform }} target=${{ matrix.target }} arch=${{ matrix.config.arch }} -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+          # For Android: detect the installed NDK version dynamically and pass it
+          # to scons so godot-cpp doesn't use its hardcoded default (28.1.x).
+          if [ "${{ matrix.config.platform }}" = "android" ]; then
+            NDK_VER=$(ls "${ANDROID_SDK_ROOT}/ndk/" | sort -V | tail -1)
+            echo "Using NDK version: ${NDK_VER}"
+            scons platform=${{ matrix.config.platform }} target=${{ matrix.target }} arch=${{ matrix.config.arch }} ndk_version="${NDK_VER}" -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+          else
+            scons platform=${{ matrix.config.platform }} target=${{ matrix.target }} arch=${{ matrix.config.arch }} -j$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)
+          fi
 
       - name: Stage artifacts
         shell: bash
