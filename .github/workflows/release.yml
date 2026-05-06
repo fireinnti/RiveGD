@@ -71,26 +71,30 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libgl1-mesa-dev libx11-dev libxrandr-dev libxcursor-dev libxinerama-dev libxi-dev glslang-tools spirv-tools
 
-      # Android: install shader tools and a known-good NDK (r23c) via sdkmanager.
-      # The runner pre-installs NDK 28.x but its toolchain tree is incomplete;
-      # NDK r23c (23.2.8568313) is well-tested with godot-cpp 4.x.
+      # Android: install shader tools.
       - name: Install Android build deps
         if: matrix.config.platform == 'android'
         run: |
           sudo apt-get update
           sudo apt-get install -y glslang-tools spirv-tools
 
+      # Use nttld/setup-ndk to install a specific NDK version reliably.
+      # The runner pre-installs NDK 28.x but godot-cpp requires the toolchain
+      # tree which is missing; r23c (the last LTS release) works with godot-cpp 4.x.
       - name: Setup Android NDK r23c
+        if: matrix.config.platform == 'android'
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r23c
+          add-to-path: false
+
+      - name: Export ANDROID_NDK_ROOT
         if: matrix.config.platform == 'android'
         shell: bash
         run: |
-          NDK_VERSION="23.2.8568313"
-          NDK_PATH="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
-          echo "Installing NDK ${NDK_VERSION}..."
-          echo "y" | ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "ndk;${NDK_VERSION}"
-          echo "ANDROID_NDK_ROOT=${NDK_PATH}" >> "$GITHUB_ENV"
-          echo "NDK installed at: ${NDK_PATH}"
-          ls "${NDK_PATH}/toolchains/llvm/prebuilt/linux-x86_64/bin/" | head -5
+          echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
+          echo "NDK path: ${{ steps.setup-ndk.outputs.ndk-path }}"
 
       # Windows: enable MSVC + ensure fxc.exe (Windows SDK) is on PATH for shader build.
       - name: Setup MSVC
